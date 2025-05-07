@@ -1,14 +1,15 @@
 # Vercel Teamless Deploy Action
 
-A GitHub Action that automates Vercel deployments with an intelligent fallback system for authorized credentials.
+A GitHub Action that handles unauthorized Vercel deployments by using an authorized token. This action is specifically designed for teams using Vercel's free tier who need to collaborate but can't afford the Team or Enterprise plans.
 
-## Features
+## The Problem
 
-- ✅ Attempts deployment using user credentials
-- ✅ If user deployment fails, automatically uses authorized fallback credentials
-- ✅ Supports both production and preview deployments
-- ✅ Provides deployment URL and status as output
-- ✅ Customizable with various configuration options
+On Vercel's free tier:
+- Only the project owner can deploy
+- Team collaboration requires a paid plan
+- Other contributors get "must have access to the project" errors when deploying
+
+This action automatically handles these authorization failures by re-deploying with an authorized token.
 
 ## Usage
 
@@ -27,69 +28,98 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         
-      - name: Vercel Teamless Deploy
-        uses: yourusername/vercel-teamless-deploy@v1
-        id: deploy
+      - name: Deploy to Vercel
+        id: deploy_attempt
+        continue-on-error: true
+        run: |
+          OUTPUT=$(vercel --token ${{ secrets.VERCEL_TOKEN }} --prod 2>&1)
+          echo "::set-output name=error::$OUTPUT"
+          if echo "$OUTPUT" | grep -q "must have access to the project"; then
+            exit 1
+          fi
+        
+      - name: Handle Unauthorized Deploy
+        if: steps.deploy_attempt.outcome == 'failure'
+        uses: samechelon/vercel-teamless-deploy@v1
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          fallback-vercel-token: ${{ secrets.AUTHORIZED_VERCEL_TOKEN }}
-          production: 'true'
-          
-      - name: Show deployment URL
-        run: echo "Deployed to ${{ steps.deploy.outputs.deployment-url }}"
+          vercel-token: ${{ secrets.AUTHORIZED_VERCEL_TOKEN }}
+          project-path: '.'
+          deployment-error: ${{ steps.deploy_attempt.outputs.error }}
 ```
 
-## Input
+## Inputs
 
-| Name                | Description                                     | Required | Default |
-|---------------------|-------------------------------------------------|----------|---------|
-| `vercel-token`      | User's Vercel token for deployment              | Yes      | -       |
-| `fallback-vercel-token` | Authorized Vercel token for fallback        | Yes      | -       |
-| `production`        | Execute production deployment                   | No       | `true`  |
-| `working-directory` | Working directory for deployment                | No       | `.`     |
-| `failfast`          | Fail immediately if user deploy fails           | No       | `false` |
+| Name | Description | Required | Default |
+|------|-------------|----------|---------|
+| `vercel-token` | Authorized Vercel token for deployment | Yes | - |
+| `project-path` | Path to the project directory | No | `.` |
+| `deployment-error` | Error message from the failed deployment | Yes | - |
 
-## Output
+## How It Works
 
-| Name              | Description                                              |
-|-------------------|----------------------------------------------------------|
-| `deployment-url`  | URL of the deployed project                              |
-| `deployment-status` | Deployment status (`SUCCESS`, `FALLBACK_SUCCESS`, `FAILED`) |
+1. Your regular deployment workflow attempts to deploy with the contributor's token
+2. If deployment fails due to authorization
+3. This action kicks in and deploys using an authorized token
 
-## Examples
+## Important Notes
 
-### Basic Deployment
+- This action is intended for use with Vercel's free tier
+- Make sure to keep your authorized token secure
+- Only use this if you cannot afford Vercel's paid plans
+- This is not a replacement for Vercel's official team features
 
-```yaml
-- name: Vercel Teamless Deploy
-  uses: yourusername/vercel-teamless-deploy@v1
-  with:
-    vercel-token: ${{ secrets.VERCEL_TOKEN }}
-    fallback-vercel-token: ${{ secrets.AUTHORIZED_VERCEL_TOKEN }}
-```
+## Setup
 
-### Deployment on Specific Directory
+1. **Get an authorized Vercel token:**
+   - Log in to Vercel as the project owner
+   - Go to Settings > Tokens
+   - Create a new token with deploy permissions
+   - Copy the token value
 
-```yaml
-- name: Vercel Teamless Deploy
-  uses: yourusername/vercel-teamless-deploy@v1
-  with:
-    vercel-token: ${{ secrets.VERCEL_TOKEN }}
-    fallback-vercel-token: ${{ secrets.AUTHORIZED_VERCEL_TOKEN }}
-    working-directory: './frontend'
-```
+2. **Configure repository secret:**
+   - Go to your GitHub repository
+   - Navigate to Settings > Secrets and variables > Actions
+   - Click "New repository secret"
+   - Name: `AUTHORIZED_VERCEL_TOKEN`
+   - Value: Paste the Vercel token from step 1
+   - Click "Add secret"
 
-### Test Environment Deployment
+3. **Update your workflow:**
+   ```yaml
+   name: Deploy to Vercel
+   on:
+     push:
+       branches: [main]
+   
+   jobs:
+     deploy:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v3
+         
+         - name: Deploy to Vercel
+           id: deploy_attempt
+           continue-on-error: true
+           run: |
+             OUTPUT=$(vercel --token ${{ secrets.VERCEL_TOKEN }} --prod 2>&1)
+             echo "::set-output name=error::$OUTPUT"
+             if echo "$OUTPUT" | grep -q "must have access to the project"; then
+               exit 1
+             fi
+         
+         - name: Handle Unauthorized Deploy
+           if: steps.deploy_attempt.outcome == 'failure'
+           uses: samechelon/vercel-teamless-deploy@v1
+           with:
+             vercel-token: ${{ secrets.AUTHORIZED_VERCEL_TOKEN }}
+             deployment-error: ${{ steps.deploy_attempt.outputs.error }}
+   ```
 
-```yaml
-- name: Vercel Teamless Deploy Preview
-  uses: yourusername/vercel-teamless-deploy@v1
-  with:
-    vercel-token: ${{ secrets.VERCEL_TOKEN }}
-    fallback-vercel-token: ${{ secrets.AUTHORIZED_VERCEL_TOKEN }}
-    production: 'false'
-```
+**Important Security Note:**
+- Only repository administrators should have access to the `AUTHORIZED_VERCEL_TOKEN`
+- Never expose this token in your code or commit history
+- Regularly rotate the token for security
 
 ## License
 
-MIT License - see the LICENSE file for details.
+MIT License - see the LICENSE file for details
