@@ -2,8 +2,8 @@ name: 'Vercel Teamless Deploy'
 description: 'Automatically deploys to Vercel when unauthorized users trigger deployments'
 author: 'Samuele Salines'
 branding:
-  icon: 'cloud'
-  color: 'black'
+  icon: 'triangle'
+  color: 'gray-dark'
 
 inputs:
   vercel-token:
