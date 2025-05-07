@@ -1,0 +1,48 @@
+name: 'Vercel Teamless Deploy'
+description: 'Automatically deploys to Vercel when unauthorized users trigger deployments'
+author: 'Samuele Salines'
+branding:
+  icon: 'cloud'
+  color: 'black'
+
+inputs:
+  vercel-token:
+    description: 'Authorized Vercel token for deployment'
+    required: true
+  project-path:
+    description: 'Path to the project directory'
+    required: false
+    default: '.'
+  deployment-error:
+    description: 'The error message from the failed deployment'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check for authorization error
+      shell: bash
+      run: |
+        if [[ "${{ inputs.deployment-error }}" != *"must have access to the project"* ]]; then
+          echo "Not an authorization error. Skipping deployment."
+          exit 0
+        fi
+
+    - name: Setup Node.js
+      if: success()
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+      shell: bash
+
+    - name: Install Vercel CLI
+      if: success()
+      run: npm install -g vercel
+      shell: bash
+
+    - name: Deploy to Vercel
+      if: success()
+      run: |
+        cd ${{ inputs.project-path }}
+        vercel --prod --token=${{ inputs.vercel-token }} --confirm
+      shell: bash
