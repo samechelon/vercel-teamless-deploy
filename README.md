@@ -120,6 +120,82 @@ jobs:
 - Never expose this token in your code or commit history
 - Regularly rotate the token for security
 
+## Testing Locally
+
+You can test this GitHub Action locally using [act](https://github.com/nektos/act). Follow these steps:
+
+1. **Install act:**
+   ```bash
+   # Using Windows Package Manager (winget)
+   winget install nektos.act
+
+   # Using Chocolatey (Windows)
+   choco install act-cli
+
+   # Using Scoop (Windows)
+   scoop install act
+   ```
+
+2. **Create a secrets file:**
+   Create a file named `.secrets` in your repository root:
+   ```bash
+   # This can be any string since it's just for testing
+   TEST_VERCEL_TOKEN=dummy-token
+   ```
+
+3. **Add test workflow:**
+   Create [`.github/workflows/test.yml`](.github/workflows/test.yml) with the following content:
+   ```yaml
+   name: Test Action
+
+   on:
+     push:
+       branches: [ main ]
+     pull_request:
+       branches: [ main ]
+
+   jobs:
+     test-action:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v3
+         
+         # This step simulates a deployment failure without actually calling Vercel
+         - name: Simulate failed deployment
+           id: deploy_attempt
+           run: |
+             echo "::set-output name=error::Error: User must have access to the project to create deployments"
+           
+         - name: Test Action
+           run: |
+             node ./test/index.js
+           env:
+             INPUT_VERCEL_TOKEN: ${{ secrets.TEST_VERCEL_TOKEN }}
+             INPUT_PROJECT_PATH: './test'
+             INPUT_DEPLOYMENT_ERROR: ${{ steps.deploy_attempt.outputs.error }}
+
+         - name: Verify deployment attempt
+           run: |
+             if [[ -f "deployment_attempted" ]]; then
+               echo "Action responded to authorization error"
+             else
+               echo "Action did not respond correctly"
+               exit 1
+             fi
+   ```
+
+4. **Run the test:**
+   ```bash
+   act -j test-action --secret-file .secrets
+   ```
+
+5. **Add to .gitignore:**
+   ```
+   .secrets
+   ```
+
+**Note:** Make sure to add `.secrets` to your `.gitignore` file to prevent accidentally committing sensitive information
+
 ## License
 
 MIT License - see the LICENSE file for details
