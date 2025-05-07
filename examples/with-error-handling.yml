@@ -1,0 +1,24 @@
+name: Basic Vercel Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy to Vercel
+        id: deploy
+        continue-on-error: true
+        run: vercel --token ${{ secrets.VERCEL_TOKEN }} --prod
+
+      - name: Handle Unauthorized Deploy
+        if: steps.deploy.outcome == 'failure'
+        uses: samechelon/vercel-teamless-deploy@v1
+        with:
+          vercel-token: ${{ secrets.AUTHORIZED_VERCEL_TOKEN }}
+          deployment-error: ${{ steps.deploy.outputs.error }}
