@@ -12,21 +12,23 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      # Test the action with a test Vercel token
-      # Note: this is just a test, so we use dummy tokens
+      - name: Simulate failed deployment
+        id: deploy_attempt
+        run: |
+          echo "::set-output name=error::Error: User must have access to the project to create deployments"
+        
       - name: Test Action
         uses: ./
-        id: deploy
         with:
-          vercel-token: ${{ secrets.TEST_VERCEL_TOKEN || 'dummy-token' }}
-          fallback-vercel-token: ${{ secrets.TEST_FALLBACK_TOKEN || 'dummy-fallback-token' }}
-          # For testing set failfast to true to immediately see errors
-          failfast: 'true'
-          # For testing set production to false
-          production: 'false'
-        continue-on-error: true
-      
-      - name: Print outputs
+          vercel-token: ${{ secrets.TEST_VERCEL_TOKEN }}
+          project-path: './test-project'
+          deployment-error: ${{ steps.deploy_attempt.outputs.error }}
+
+      - name: Verify deployment attempt
         run: |
-          echo "Deployment status: ${{ steps.deploy.outputs.deployment-status }}"
-          echo "Deployment URL (if available): ${{ steps.deploy.outputs.deployment-url }}"
+          if [[ -f "deployment_attempted" ]]; then
+            echo "Action responded to authorization error"
+          else
+            echo "Action did not respond correctly"
+            exit 1
+          fi
