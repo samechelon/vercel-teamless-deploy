@@ -1,0 +1,32 @@
+name: Test Action
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      # Test the action with a test Vercel token
+      # Note: this is just a test, so we use dummy tokens
+      - name: Test Action
+        uses: ./
+        id: deploy
+        with:
+          vercel-token: ${{ secrets.TEST_VERCEL_TOKEN || 'dummy-token' }}
+          fallback-vercel-token: ${{ secrets.TEST_FALLBACK_TOKEN || 'dummy-fallback-token' }}
+          # For testing set failfast to true to immediately see errors
+          failfast: 'true'
+          # For testing set production to false
+          production: 'false'
+        continue-on-error: true
+      
+      - name: Print outputs
+        run: |
+          echo "Deployment status: ${{ steps.deploy.outputs.deployment-status }}"
+          echo "Deployment URL (if available): ${{ steps.deploy.outputs.deployment-url }}"
