@@ -18,11 +18,12 @@ jobs:
           echo "::set-output name=error::Error: User must have access to the project to create deployments"
         
       - name: Test Action
-        uses: ./
-        with:
-          vercel-token: ${{ secrets.TEST_VERCEL_TOKEN }}
-          project-path: './test-project'
-          deployment-error: ${{ steps.deploy_attempt.outputs.error }}
+        run: |
+          node ./test/index.js
+        env:
+          INPUT_VERCEL_TOKEN: ${{ secrets.TEST_VERCEL_TOKEN }}
+          INPUT_PROJECT_PATH: './test'
+          INPUT_DEPLOYMENT_ERROR: ${{ steps.deploy_attempt.outputs.error }}
 
       - name: Verify deployment attempt
         run: |
